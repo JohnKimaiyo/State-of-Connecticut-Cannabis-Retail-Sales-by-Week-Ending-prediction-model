@@ -1,40 +1,63 @@
 from flask import Flask, request, render_template
 import pandas as pd
-from sklearn.linear_model import LinearRegression
 import joblib
 
 app = Flask(__name__)
 
-# Load the trained model (assuming you have saved it as a file)
+# Load the trained model
 model = joblib.load('Trained Model/cannabis_sales_model.pkl')
+
+# Get expected feature names
+expected_features = model.feature_names_in_
 
 @app.route('/')
 def home():
-    return render_template('form.html')  # Render the HTML form
+    return render_template('form.html')
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    # Get form data
-    data = {
-        'Adult-Use Retail Sales': float(request.form['adult_use_sales']),
-        'Medical Marijuana Retail Sales': float(request.form['medical_sales']),
-        'Adult-Use Products Sold': int(request.form['adult_use_products']),
-        'Medical Products Sold': int(request.form['medical_products']),
-        'Adult-Use Average Product Price': float(request.form['adult_use_avg_price']),
-        'Medical Average Product Price': float(request.form['medical_avg_price']),
-        'Year': int(request.form['year']),
-        'Month': int(request.form['month']),
-        'Day': int(request.form['day'])
-    }
+    try:
+        # Helper functions for safe conversions
+        def safe_float(value, default=0.0):
+            try:
+                return float(value) if value.strip() else default
+            except ValueError:
+                return default
 
-    # Convert data to DataFrame
-    input_data = pd.DataFrame([data])
+        def safe_int(value, default=0):
+            try:
+                return int(value) if value.strip() else default
+            except ValueError:
+                return default
 
-    # Make prediction
-    prediction = model.predict(input_data)
+        # Extract values safely
+        data = {
+            'Adult-Use Retail Sales': safe_float(request.form.get('adult_use_sales', '0')),
+            'Medical Marijuana Retail Sales': safe_float(request.form.get('medical_sales', '0')),
+            'Adult-Use Products Sold': safe_int(request.form.get('adult_use_products', '0')),
+            'Medical Products Sold': safe_int(request.form.get('medical_products', '0')),
+            'Adult-Use Average Product Price': safe_float(request.form.get('adult_use_avg_price', '0')),
+            'Medical Average Product Price': safe_float(request.form.get('medical_avg_price', '0')),
+            'Year': safe_int(request.form.get('year', '2024')),
+            'Month': safe_int(request.form.get('month', '1')),
+            'Day': safe_int(request.form.get('day', '1')),
+        }
 
-    # Return the prediction
-    return f"Predicted Total Sales: ${prediction[0]:.2f}"
+        # Compute missing features
+        data['Total Products Sold'] = data['Adult-Use Products Sold'] + data['Medical Products Sold']
+        data['Total Products Sold per Week'] = data['Total Products Sold'] / 7  # Assuming weekly data
+
+        # Convert to DataFrame and reorder columns
+        input_data = pd.DataFrame([data])
+        input_data = input_data[expected_features]  
+
+        # Make prediction
+        prediction = model.predict(input_data)[0]
+
+        return render_template('result.html', prediction=prediction)
+
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 if __name__ == '__main__':
     app.run(debug=True)
