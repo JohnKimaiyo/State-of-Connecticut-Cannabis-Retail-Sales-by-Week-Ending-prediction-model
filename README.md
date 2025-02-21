@@ -4,3 +4,6 @@ This data set contains preliminary weekly retail sales data for cannabis and can
 
 
 Data Source --> Jupiter Notebook --> Download Trained data --> Deploy Flask Server --->Query Future Sales
+
+
+Video Demo : https://youtu.be/Tevt26XjIhE
